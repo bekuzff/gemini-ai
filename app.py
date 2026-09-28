@@ -6,7 +6,7 @@ import telebot
 
 # 1. API va Tokenlar
 GEMINI_API_KEY = "AQ.Ab8RN6JGl7IOngCjEaiNEMyUQDfQ8NB3qhNBfYU1EM1bjdo73A"
-TELEGRAM_BOT_TOKEN = "8838688583:AAGN_uMCIJDIzEasTyWQyrcUofSQlCBh3n8"
+TELEGRAM_BOT_TOKEN = "8838688583:AAGaVcFzl46v4-QHcHXanWGsAVzqYWVFxbM"
 
 # 2. Sozlamalar
 genai.configure(api_key=GEMINI_API_KEY)
