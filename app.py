@@ -1,20 +1,19 @@
 import os
 from threading import Thread
 from flask import Flask
-from google import genai
+import google.generativeai as genai
 import telebot
 
-# 1. Gemini va Telegram Tokenlari
+# 1. API va Tokenlar
 GEMINI_API_KEY = "AQ.Ab8RN6JGl7IOngCjEaiNEMyUQDfQ8NB3qhNBfYU1EM1bjdo73A"
 TELEGRAM_BOT_TOKEN = "8838688583:AAGN_uMCIJDIzEasTyWQyrcUofSQlCBh3n8"
 
-# Gemini mijozini ishga tushirish
-client = genai.Client(api_key=GEMINI_API_KEY)
-
-# Telegram botni ishga tushirish
+# 2. Sozlamalar
+genai.configure(api_key=GEMINI_API_KEY)
+model = genai.GenerativeModel("gemini-1.5-flash")
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
-# Flask veb-server (Render uchun)
+# 3. Render uchun Flask server
 app = Flask("")
 
 
@@ -28,16 +27,14 @@ def run_flask():
   app.run(host="0.0.0.0", port=port)
 
 
-# Telegram xabarlarini qayta ishlash
+# 4. Telegram xabarlariga javob berish
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
   try:
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=message.text,
-    )
+    response = model.generate_content(message.text)
     bot.reply_to(message, response.text)
   except Exception as e:
+    print(f"Xatolik: {e}")
     bot.reply_to(message, "Xatolik yuz berdi. Qaytadan urinib ko'ring.")
 
 
