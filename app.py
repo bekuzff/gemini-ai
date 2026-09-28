@@ -4,9 +4,9 @@ from flask import Flask
 from google import genai
 import telebot
 
-# 1. Gemini va Telegram Tokenlarini kiriting
-GEMINI_API_KEY = "AQ.Ab8RN6I3We6tVwHRO1Rmy9jlp3BBH06n5F5iHx7QTi_9UAED_g"
-TELEGRAM_BOT_TOKEN = "8838688583:AAH4lv5JIVqRG9wFSAGIvRjW8WD39F5VxbQ"
+# 1. Gemini va Telegram Tokenlari
+GEMINI_API_KEY = "AQ.Ab8RN6JGl7IOngCjEaiNEMyUQDfQ8NB3qhNBfYU1EM1bjdo73A"
+TELEGRAM_BOT_TOKEN = "8838688583:AAGN_uMCIJDIzEasTyWQyrcUofSQlCBh3n8"
 
 # Gemini mijozini ishga tushirish
 client = genai.Client(api_key=GEMINI_API_KEY)
@@ -14,19 +14,18 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 # Telegram botni ishga tushirish
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
-# Flask veb-server (Render o'chib qolmasligi uchun)
-app = Flask('')
+# Flask veb-server (Render uchun)
+app = Flask("")
 
 
-@app.route('/')
+@app.route("/")
 def home():
   return "Bot muvaffaqiyatli ishlamoqda!"
 
 
 def run_flask():
-  # Render avtomatik beradigan PORT da ishlaydi
   port = int(os.environ.get("PORT", 8080))
-  app.run(host='0.0.0.0', port=port)
+  app.run(host="0.0.0.0", port=port)
 
 
 # Telegram xabarlarini qayta ishlash
@@ -34,7 +33,7 @@ def run_flask():
 def handle_message(message):
   try:
     response = client.models.generate_content(
-        model='gemini-2.5-flash',
+        model="gemini-2.5-flash",
         contents=message.text,
     )
     bot.reply_to(message, response.text)
@@ -43,9 +42,6 @@ def handle_message(message):
 
 
 if __name__ == "__main__":
-  # Flask serverni alohida oqimda ishga tushiramiz
   t = Thread(target=run_flask)
   t.start()
-
-  # Botni uzluksiz eshitish rejimiga tushiramiz
   bot.infinity_polling()
