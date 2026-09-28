@@ -13,13 +13,13 @@ genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel("gemini-1.5-flash")
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
-# 3. Render uchun Flask server
+# 3. Flask server (Render uchun)
 app = Flask("")
 
 
 @app.route("/")
 def home():
-  return "Bot muvaffaqiyatli ishlamoqda!"
+  return "Bot ishlamoqda!"
 
 
 def run_flask():
@@ -27,7 +27,7 @@ def run_flask():
   app.run(host="0.0.0.0", port=port)
 
 
-# 4. Telegram xabarlariga javob berish
+# 4. Telegram xabarlarini qayta ishlash
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
   try:
