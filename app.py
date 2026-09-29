@@ -13,11 +13,10 @@ GEMINI_API_KEY = (
     or "AQ.Ab8RN6KvSU0Tuj6_2Ss5xxnZ5ULaSlTdOjaqPU3Ye4bti7_a7w"
 )
 
-# Vertex AI SDK orqali Client yaratish
+# Credentials qidirish xatosini chetlab o'tish uchun v1alpha va direct API-key autentifikatsiyasi
 client = genai.Client(
-    vertexai=True,
-    project="215236478784",
-    location="us-central1",
+    api_key=GEMINI_API_KEY,
+    http_options={"api_version": "v1alpha"},
 )
 
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
@@ -38,7 +37,7 @@ def run_flask():
 def send_welcome(message):
   bot.reply_to(
       message,
-      "Assalomu alaykum! Men Gemini AI botiman. Savolingizni yuboring!",
+      "Assalomu alaykum! Men AI botiman. Savolingizni yozing!",
   )
 
 
@@ -46,14 +45,14 @@ def send_welcome(message):
 def handle_message(message):
   try:
     response = client.models.generate_content(
-        model="gemini-1.5-flash", contents=message.text
+        model="gemini-2.5-flash", contents=message.text
     )
     if response.text:
       bot.reply_to(message, response.text)
     else:
       bot.reply_to(message, "Javob olib bo'lmadi.")
   except Exception as e:
-    bot.reply_to(message, f"Xatolik yuz berdi:\n{e}")
+    bot.reply_to(message, f"Xatolik: {e}")
 
 
 if __name__ == "__main__":
