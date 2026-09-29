@@ -1,4 +1,3 @@
 pyTelegramBotAPI
 Flask
 google-genai
-google-auth
