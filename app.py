@@ -11,6 +11,7 @@ TELEGRAM_BOT_TOKEN = os.environ.get(
     "TELEGRAM_BOT_TOKEN", "8838688583:AAGaVcFzl46v4-QHcHXanWGsAVzqYWVFxbM"
 )
 
+# Gemini AI mijozini sozlash
 client = genai.Client(api_key=GEMINI_API_KEY)
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
@@ -27,15 +28,27 @@ def run_flask():
   app.run(host="0.0.0.0", port=port)
 
 
+# /start va /help buyruqlari uchun
+@bot.message_handler(commands=["start", "help"])
+def send_welcome(message):
+  bot.reply_to(
+      message,
+      "Assalomu alaykum! Men Gemini Sun'iy Intellekt boti bo'laman. Menga"
+      " xohlagan savolingizni yozing!",
+  )
+
+
+# Barcha matnli xabarlarni Sun'iy Intellektga yuborish
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
   try:
+    # Gemini modeliga foydalanuvchi matnini yuborish
     response = client.models.generate_content(
-        model="gemini-2.5-flash", contents=message.text
+        model="gemini-1.5-flash", contents=message.text
     )
     bot.reply_to(message, response.text)
   except Exception as e:
-    bot.reply_to(message, f"Xatolik:\n{e}")
+    bot.reply_to(message, f"Xatolik yuz berdi:\n{e}")
 
 
 if __name__ == "__main__":
