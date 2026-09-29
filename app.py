@@ -4,7 +4,6 @@ from flask import Flask
 from google import genai
 import telebot
 
-# API kalit va Telegram token
 GEMINI_API_KEY = os.environ.get(
     "GEMINI_API_KEY", "AQ.Ab8RN6JwyrnbWF0sSI_Dfilmd2KJ50aRbOdn6yF6RZ_ittP8xQ"
 )
@@ -12,7 +11,6 @@ TELEGRAM_BOT_TOKEN = os.environ.get(
     "TELEGRAM_BOT_TOKEN", "8838688583:AAGaVcFzl46v4-QHcHXanWGsAVzqYWVFxbM"
 )
 
-# Yangi rasmiy Google GenAI mijozi
 client = genai.Client(api_key=GEMINI_API_KEY)
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
