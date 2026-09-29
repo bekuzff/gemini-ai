@@ -2,6 +2,7 @@ import os
 from threading import Thread
 from flask import Flask
 from google import genai
+from google.genai import types
 import telebot
 
 TELEGRAM_BOT_TOKEN = (
@@ -13,10 +14,10 @@ GEMINI_API_KEY = (
     or "AQ.Ab8RN6KvSU0Tuj6_2Ss5xxnZ5ULaSlTdOjaqPU3Ye4bti7_a7w"
 )
 
-# Credentials qidirish xatosini chetlab o'tish uchun v1alpha va direct API-key autentifikatsiyasi
+# AQ... kalitlari uchun yangi stable (v1) mijozini sozlash
 client = genai.Client(
     api_key=GEMINI_API_KEY,
-    http_options={"api_version": "v1alpha"},
+    http_options=types.HttpOptions(api_version="v1"),
 )
 
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
@@ -37,7 +38,7 @@ def run_flask():
 def send_welcome(message):
   bot.reply_to(
       message,
-      "Assalomu alaykum! Men AI botiman. Savolingizni yozing!",
+      "Assalomu alaykum! Men Gemini AI botiman. Savolingizni yuboring!",
   )
 
 
@@ -45,7 +46,8 @@ def send_welcome(message):
 def handle_message(message):
   try:
     response = client.models.generate_content(
-        model="gemini-2.5-flash", contents=message.text
+        model="gemini-2.5-flash",
+        contents=message.text,
     )
     if response.text:
       bot.reply_to(message, response.text)
