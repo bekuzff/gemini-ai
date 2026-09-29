@@ -1,8 +1,7 @@
 import os
 from threading import Thread
 from flask import Flask
-from google import genai
-from google.genai import types
+import requests
 import telebot
 
 TELEGRAM_BOT_TOKEN = (
@@ -12,12 +11,6 @@ TELEGRAM_BOT_TOKEN = (
 GEMINI_API_KEY = (
     os.environ.get("GEMINI_API_KEY")
     or "AQ.Ab8RN6KvSU0Tuj6_2Ss5xxnZ5ULaSlTdOjaqPU3Ye4bti7_a7w"
-)
-
-# AQ... kalitlari uchun yangi stable (v1) mijozini sozlash
-client = genai.Client(
-    api_key=GEMINI_API_KEY,
-    http_options=types.HttpOptions(api_version="v1"),
 )
 
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
@@ -38,23 +31,50 @@ def run_flask():
 def send_welcome(message):
   bot.reply_to(
       message,
-      "Assalomu alaykum! Men Gemini AI botiman. Savolingizni yuboring!",
+      "Assalomu alaykum! Men AI botiman. Savolingizni yuboring!",
   )
 
 
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
   try:
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=message.text,
-    )
-    if response.text:
-      bot.reply_to(message, response.text)
+    # Direct REST API request using Bearer authentication
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+
+    headers = {
+        "Authorization": f"Bearer {GEMINI_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    payload = {"contents": [{"parts": [{"text": message.text}]}]}
+
+    response = requests.post(url, headers=headers, json=payload)
+    res_data = response.json()
+
+    if response.status_code == 200:
+      text_response = res_data["candidates"][0]["content"]["parts"][0]["text"]
+      bot.reply_to(message, text_response)
     else:
-      bot.reply_to(message, "Javob olib bo'lmadi.")
+      # If Bearer fails, fallback to query param
+      url_alt = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
+      response_alt = requests.post(
+          url_alt, json=payload, headers={"Content-Type": "application/json"}
+      )
+      res_alt_data = response_alt.json()
+
+      if response_alt.status_code == 200:
+        text_response = res_alt_data["candidates"][0]["content"]["parts"][0][
+            "text"
+        ]
+        bot.reply_to(message, text_response)
+      else:
+        err_msg = res_data.get("error", {}).get(
+            "message", response_alt.text
+        )
+        bot.reply_to(message, f"Xatolik: {err_msg}")
+
   except Exception as e:
-    bot.reply_to(message, f"Xatolik: {e}")
+    bot.reply_to(message, f"Xatolik yuz berdi: {e}")
 
 
 if __name__ == "__main__":
