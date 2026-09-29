@@ -10,7 +10,7 @@ bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 
 ADMINS = [8372285180]
 
-# --- RENDER UCHUN FLASK SERVER (Portni band qilish uchun) ---
+# --- RENDER UCHUN FLASK SERVER ---
 app = Flask('')
 
 @app.route('/')
@@ -35,7 +35,8 @@ def init_db():
             username TEXT,
             full_name TEXT,
             referrer_id INTEGER,
-            referrals INTEGER DEFAULT 0
+            referrals INTEGER DEFAULT 0,
+            score INTEGER DEFAULT 0
         )
     """)
     cursor.execute("""
@@ -92,7 +93,7 @@ def send_welcome(message):
         cursor.execute("INSERT INTO users (user_id, username, full_name, referrer_id) VALUES (?, ?, ?, ?)",
                        (user_id, message.from_user.username, message.from_user.first_name, referrer_id))
         if referrer_id:
-            cursor.execute("UPDATE users SET referrals = referrals + 1 WHERE user_id = ?", (referrer_id,))
+            cursor.execute("UPDATE users SET referrals = referrals + 1, score = score + 1 WHERE user_id = ?", (referrer_id,))
         conn.commit()
     conn.close()
 
@@ -113,14 +114,13 @@ def send_welcome(message):
 
 def show_main_menu(chat_id, name):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add("🔗 Mening havolam", "🏆 Top Reyting")
-    markup.add("📊 Statistika")
+    markup.add("⚔️ Battle yaratish", "🔗 Mening havolam")
+    markup.add("🏆 Top Reyting", "📊 Statistika")
     if chat_id in ADMINS:
-        markup.add("⚙️ Admin Panel")
+        markup.add("⚙️️ Admin Panel")
     
     bot.send_message(chat_id, f"Salom, <b>{name}</b>! Botga xush kelibsiz.", reply_markup=markup)
 
-# --- OBUNANI QAYTA TEKSHIRISH CALLBACK ---
 @bot.callback_query_handler(func=lambda call: call.data == "check_sub")
 def callback_check_sub(call):
     user_id = call.from_user.id
@@ -131,7 +131,7 @@ def callback_check_sub(call):
         bot.delete_message(call.message.chat.id, call.message.message_id)
         show_main_menu(call.message.chat.id, call.from_user.first_name)
 
-# --- ASOSIY MENYU TUGMALARI ---
+# --- ASOSIY MENYU VA BATTLE ---
 @bot.message_handler(func=lambda message: True)
 def handle_text(message):
     user_id = message.from_user.id
@@ -142,25 +142,31 @@ def handle_text(message):
 
     text = message.text
 
-    if text == "🔗 Mening havolam":
+    if text == "⚔️ Battle yaratish":
+        markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+        markup.add("🔙 Orqaga")
+        msg = bot.send_message(user_id, "📢 Kanalga tashlamoqchi bo'lgan <b>#nft</b> postini yoki ishtirokchi matnini yuboring:", reply_markup=markup)
+        bot.register_next_step_handler(msg, create_battle_step)
+
+    elif text == "🔗 Mening havolam":
         ref_link = f"https://t.me/{bot.get_me().username}?start={user_id}"
         conn = db_connect()
         cursor = conn.cursor()
-        cursor.execute("SELECT referrals FROM users WHERE user_id = ?", (user_id,))
-        refs = cursor.fetchone()[0]
+        cursor.execute("SELECT referrals, score FROM users WHERE user_id = ?", (user_id,))
+        res = cursor.fetchone()
         conn.close()
-        bot.send_message(user_id, f"🔗 Sizning taklif havolangiz:\n{ref_link}\n\n👥 Taklif qilgan do'stlaringiz: <b>{refs} ta</b>")
+        bot.send_message(user_id, f"🔗 Sizning taklif havolangiz:\n{ref_link}\n\n👥 Takliflar: <b>{res[0]} ta</b>\n⭐ Ballaringiz: <b>{res[1]} ta</b>")
 
     elif text == "🏆 Top Reyting":
         conn = db_connect()
         cursor = conn.cursor()
-        cursor.execute("SELECT full_name, referrals FROM users ORDER BY referrals DESC LIMIT 10")
+        cursor.execute("SELECT full_name, score FROM users ORDER BY score DESC LIMIT 10")
         top_users = cursor.fetchall()
         conn.close()
         
-        text_top = "🏆 <b>TOP 10 REFERAL</b>\n\n"
+        text_top = "🏆 <b>TOP 10 BATTLE REYTINGI</b>\n\n"
         for i, u in enumerate(top_users, 1):
-            text_top += f"{i}. {u[0]} — {u[1]} ta\n"
+            text_top += f"{i}. {u[0]} — {u[1]} ball\n"
         bot.send_message(user_id, text_top)
 
     elif text == "📊 Statistika":
@@ -174,7 +180,8 @@ def handle_text(message):
     elif text == "⚙️ Admin Panel" and user_id in ADMINS:
         markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
         markup.add("➕ Kanal qo'shish", "➖ Kanalni o'chirish")
-        markup.add("📢 Xabar tarqatish", "🔙 Orqaga")
+        markup.add("👥 Foydalanuvchini boshqarish", "📢 Xabar tarqatish")
+        markup.add("🔙 Orqaga")
         bot.send_message(user_id, "⚙️ Admin paneliga xush kelibsiz:", reply_markup=markup)
 
     elif text == "🔙 Orqaga":
@@ -199,11 +206,114 @@ def handle_text(message):
         msg = bot.send_message(user_id, text_ch)
         bot.register_next_step_handler(msg, remove_channel_step)
 
+    elif text == "👥 Foydalanuvchini boshqarish" and user_id in ADMINS:
+        msg = bot.send_message(user_id, "Boshqarish uchun foydalanuvchining **Telegram ID** raqamini yuboring:")
+        bot.register_next_step_handler(msg, manage_user_step)
+
     elif text == "📢 Xabar tarqatish" and user_id in ADMINS:
         msg = bot.send_message(user_id, "Barcha foydalanuvchilarga yuboriladigan xabarni yuboring:")
         bot.register_next_step_handler(msg, broadcast_step)
 
-# --- ADMIN FUNKSIYALARI ---
+# --- BATTLE YARATISH ---
+def create_battle_step(message):
+    if message.text == "🔙 Orqaga":
+        show_main_menu(message.from_user.id, message.from_user.first_name)
+        return
+
+    markup = types.InlineKeyboardMarkup()
+    markup.add(
+        types.InlineKeyboardButton(text="🔥 Qatnashish", url=f"https://t.me/{bot.get_me().username}?start={message.from_user.id}"),
+        types.InlineKeyboardButton(text="📊 Natijalar", callback_data="battle_results")
+    )
+
+    battle_text = f"<b>3 ➔ N F T B A T L 👑</b>\n\nIshtirokchi: {message.from_user.first_name} (@{message.from_user.username or 'yoq'})\n\n{message.text}"
+    
+    try:
+        target_channel = "@dark_vip_nft"  # O'z kanalingiz username'ini yozing
+        bot.send_message(target_channel, battle_text, reply_markup=markup)
+        bot.send_message(message.from_user.id, "✅ Battle posti kanalda e'lon qilindi!", reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add("⚔️ Battle yaratish", "🔙 Orqaga"))
+    except Exception as e:
+        bot.send_message(message.from_user.id, f"❌ Xatolik (Kanalga yozib bo'lmadi, bot adminligini tekshiring): {e}")
+
+@bot.callback_query_handler(func=lambda call: call.data == "battle_results")
+def battle_results_callback(call):
+    bot.answer_callback_query(call.id, "📊 Ovozlar hisoblanmoqda...", show_alert=True)
+
+# --- FOYDALANUVCHINI BOSHQARISH FUNKSIYALARI ---
+def manage_user_step(message):
+    try:
+        target_id = int(message.text.strip())
+    except ValueError:
+        bot.send_message(message.from_user.id, "❌ Noto'g'ri ID kiritildi. Faqat raqam yuboring.")
+        return
+
+    conn = db_connect()
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id, username, full_name, referrals, score FROM users WHERE user_id = ?", (target_id,))
+    user = cursor.fetchone()
+    conn.close()
+
+    if not user:
+        bot.send_message(message.from_user.id, "❌ Bunday ID raqamidagi foydalanuvchi topilmadi.")
+        return
+
+    info_text = (
+        f"👤 <b>Foydalanuvchi ma'lumotlari:</b>\n\n"
+        f"🆔 ID: <code>{user[0]}</code>\n"
+        f"👤 Ism: {user[2]}\n"
+        f"🔗 Username: @{user[1] or 'yoq'}\n"
+        f"👥 Takliflar: {user[3]} ta\n"
+        f"⭐ Ballar: {user[4]} ball"
+    )
+
+    markup = types.InlineKeyboardMarkup()
+    markup.add(
+        types.InlineKeyboardButton(text="➕ Ball qo'shish", callback_data=f"add_score_{target_id}"),
+        types.InlineKeyboardButton(text="➖ Ball ayirish", callback_data=f"sub_score_{target_id}")
+    )
+    markup.add(types.InlineKeyboardButton(text="🗑 Bazadan o'chirish", callback_data=f"del_user_{target_id}"))
+
+    bot.send_message(message.from_user.id, info_text, reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith(("add_score_", "sub_score_", "del_user_")))
+def user_action_callback(call):
+    data = call.data.split("_")
+    action = data[0]
+    target_id = int(data[2])
+
+    if action == "add":
+        msg = bot.send_message(call.message.chat.id, f"Qancha ball qo'shmoqchisiz? (Faqat raqam yuboring):")
+        bot.register_next_step_handler(msg, lambda m: update_user_score(m, target_id, plus=True))
+    elif action == "sub":
+        msg = bot.send_message(call.message.chat.id, f"Qancha ball ayirmoqchisiz? (Faqat raqam yuboring):")
+        bot.register_next_step_handler(msg, lambda m: update_user_score(m, target_id, plus=False))
+    elif action == "del":
+        conn = db_connect()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM users WHERE user_id = ?", (target_id,))
+        conn.commit()
+        conn.close()
+        bot.edit_message_text("🗑 Foydalanuvchi bazadan o'chirildi.", call.message.chat.id, call.message.message_id)
+
+def update_user_score(message, target_id, plus):
+    try:
+        amount = int(message.text.strip())
+    except ValueError:
+        bot.send_message(message.from_user.id, "❌ Faqat raqam kiriting!")
+        return
+
+    conn = db_connect()
+    cursor = conn.cursor()
+    if plus:
+        cursor.execute("UPDATE users SET score = score + ? WHERE user_id = ?", (amount, target_id))
+    else:
+        cursor.execute("UPDATE users SET score = score - ? WHERE user_id = ?", (amount, target_id))
+    conn.commit()
+    conn.close()
+
+    bot.send_message(message.from_user.id, f"✅ Muvaffaqiyatli bajarildi! Foydalanuvchi ballari yangilandi.")
+
+# --- ADMIN KANAL VA XABAR FUNKSIYALARI ---
 def add_channel_step(message):
     ch_id = message.text.strip()
     conn = db_connect()
@@ -244,9 +354,8 @@ def broadcast_step(message):
     bot.send_message(message.from_user.id, f"📢 Xabar {success} ta foydalanuvchiga yuborildi.")
 
 if __name__ == "__main__":
-    # Flask serverini alohida oqimda (thread) ishga tushiramiz (Render talabi uchun)
     t = threading.Thread(target=run_flask)
     t.start()
     
-    print("Bot Render uchun ishga tushdi...")
+    print("Mukammal Battle & User Control Bot Render uchun ishga tushdi...")
     bot.infinity_polling()
