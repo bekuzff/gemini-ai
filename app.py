@@ -57,7 +57,7 @@ def init_db():
 
 init_db()
 
-# Kanal kiritishda havolani tozalash funksiyasi (https://t.me/... ni @username ga o'tkazish)
+# Kanal kiritishda havolani tozalash funksiyasi
 def clean_channel_input(text):
     text = text.strip()
     if "t.me/" in text:
@@ -423,9 +423,28 @@ def create_battle_step(message):
             f"Xato tafsiloti: <code>{e}</code>"
         )
 
+# --- REAL ISHLaydigan NATIJALAR TUGMASI ---
 @bot.callback_query_handler(func=lambda call: call.data == "battle_results")
 def battle_results_callback(call):
-    bot.answer_callback_query(call.id, "📊 Ovozlar hisoblanmoqda...", show_alert=True)
+    conn = db_connect()
+    cursor = conn.cursor()
+    cursor.execute("SELECT full_name, score, referrals FROM users ORDER BY score DESC LIMIT 5")
+    top_users = cursor.fetchall()
+    conn.close()
+
+    result_text = "📊 <b>BATTLE JORIY NATIJALARI</b>\n\n"
+    if top_users:
+        for i, u in enumerate(top_users, 1):
+            result_text += f"{i}. <b>{u[0]}</b> — ⭐ {u[1]} ball (👥 {u[2]} ta taklif)\n"
+    else:
+        result_text += "Hozircha natijalar mavjud emas."
+
+    bot.answer_callback_query(call.id, "Mana joriy natijalar!", show_alert=False)
+    try:
+        bot.send_message(call.from_user.id, result_text)
+    except Exception:
+        # Agar foydalanuvchi botni start qilmagan bo'lsa yoki chat yopiq bo'lsa
+        bot.answer_callback_query(call.id, "Natijalarni ko'rish uchun avval botga /start bosing!", show_alert=True)
 
 # --- ADMIN KANAL VA SOZLAMALAR ---
 def add_channel_step(message):
