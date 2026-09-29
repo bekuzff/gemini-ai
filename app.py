@@ -4,15 +4,18 @@ from flask import Flask
 from google import genai
 import telebot
 
-# 1. Yangi API kalitingiz va Telegram Bot Tokeningiz
-GEMINI_API_KEY = "AQ.Ab8RN6LQOYs-rvffz2U2bmZNPQdAsfNINMbbc2eahLI1T7jHXw"
-TELEGRAM_BOT_TOKEN = "8838688583:AAGaVcFzl46v4-QHcHXanWGsAVzqYWVFxbM"
+# API kalit va Telegram token
+GEMINI_API_KEY = os.environ.get(
+    "GEMINI_API_KEY", "AQ.Ab8RN6JwyrnbWF0sSI_Dfilmd2KJ50aRbOdn6yF6RZ_ittP8xQ"
+)
+TELEGRAM_BOT_TOKEN = os.environ.get(
+    "TELEGRAM_BOT_TOKEN", "8838688583:AAGaVcFzl46v4-QHcHXanWGsAVzqYWVFxbM"
+)
 
-# 2. Yangi SDK bo'yicha Gemini mijozini yaratish
+# Yangi rasmiy Google GenAI mijozi
 client = genai.Client(api_key=GEMINI_API_KEY)
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 
-# 3. Render o'chib qolmasligi uchun Flask server
 app = Flask("")
 
 
@@ -26,12 +29,11 @@ def run_flask():
   app.run(host="0.0.0.0", port=port)
 
 
-# 4. Telegram xabarini Gemini AI'ga yuborish
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):
   try:
     response = client.models.generate_content(
-        model="gemini-1.5-flash", contents=message.text
+        model="gemini-2.5-flash", contents=message.text
     )
     bot.reply_to(message, response.text)
   except Exception as e:
