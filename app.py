@@ -46,7 +46,6 @@ def init_db():
             channel_name TEXT
         )
     """)
-    # Foydalanuvchilarning o'z kanallari/guruhlari uchun baza
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS user_channels (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -66,7 +65,6 @@ def init_db():
 
 init_db()
 
-# Kanal kiritishda havolani tozalash funksiyasi
 def clean_channel_input(text):
     text = text.strip()
     if "t.me/" in text:
@@ -78,7 +76,6 @@ def clean_channel_input(text):
         text = "@" + text
     return text
 
-# --- MAJBURIY OBUNANI TEKSHIRISH ---
 def check_subscriptions(user_id):
     if user_id in ADMINS:
         return []
@@ -100,7 +97,6 @@ def check_subscriptions(user_id):
             pass
     return not_subscribed
 
-# --- /START BUYRUG'I ---
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     user_id = message.from_user.id
@@ -144,7 +140,7 @@ def send_welcome(message):
                 chat = bot.get_chat(ch_id)
                 markup.add(types.InlineKeyboardButton(text=f"📢 {chat.title}", url=chat.invite_link or f"https://t.me/{chat.username}"))
             except:
-                markup.add(types.InlineKeyboardButton(text=f"📢 Kanalga o'tish", url=f"https://t.me/{ch_id.replace('@', '')}"))
+                markup.add(types.InlineKeyboardButton(text="📢 Kanalga o'tish", url=f"https://t.me/{ch_id.replace('@', '')}"))
         markup.add(types.InlineKeyboardButton(text="✅ Obunani tekshirish", callback_data="check_sub"))
         bot.send_message(message.chat.id, "⚠️ **Botdan foydalanish uchun avval quyidagi kanal(lar)ga obuna bo'ling:**", reply_markup=markup)
         return
@@ -174,7 +170,6 @@ def callback_check_sub(call):
             pass
         show_main_menu(call.message.chat.id, call.from_user.first_name)
 
-# --- BARCHA XABARLAR VA ASOSIY MENU ---
 @bot.message_handler(func=lambda message: True)
 def handle_text(message):
     user_id = message.from_user.id
@@ -209,7 +204,7 @@ def handle_text(message):
         conn.close()
 
         if not my_chans:
-            bot.send_message(user_id, "⚠️ Sizda hali ulangan kanal yoki guruh yo'q!\n\nAvval <b>"📢 Mening kanallarim"</b> bo'limidan botni o'z kanalingizga qo'shing va u yerga ulang.")
+            bot.send_message(user_id, "⚠️ Sizda hali ulangan kanal yoki guruh yo'q!\n\nAvval <b>'Mening kanallarim'</b> bo'limidan botni o'z kanalingizga qo'shing va u yerga ulang.")
             return
 
         markup = types.InlineKeyboardMarkup(row_width=1)
@@ -270,7 +265,6 @@ def handle_text(message):
     elif text == "🔙 Orqaga":
         show_main_menu(user_id, message.from_user.first_name)
 
-    # --- ADMIN BUYRUQLARI ---
     elif text == "➕ Kanal qo'shish" and user_id in ADMINS:
         msg = bot.send_message(user_id, "Majburiy obuna uchun kanal username yoki havolasini yuboring (masalan: @kanal_username):")
         bot.register_next_step_handler(msg, add_channel_step)
@@ -313,7 +307,6 @@ def handle_text(message):
         msg = bot.send_message(user_id, "Barcha foydalanuvchilarga yuboriladigan xabarni yuboring:")
         bot.register_next_step_handler(msg, broadcast_step)
 
-# --- FOYDALANUVCHI KANALINI QO'SHISH VA BOSHQARISH CALLBACKLAR ---
 @bot.callback_query_handler(func=lambda call: call.data == "add_uch")
 def add_user_channel_callback(call):
     msg = bot.send_message(call.message.chat.id, 
@@ -356,7 +349,6 @@ def delete_user_channel_callback(call):
     except:
         pass
 
-# BATTLE UCHUN KANAL TANLANGANDA
 @bot.callback_query_handler(func=lambda call: call.data.startswith("sel_ch_"))
 def select_channel_for_battle(call):
     chat_id = call.data.split("_")[2]
@@ -364,7 +356,7 @@ def select_channel_for_battle(call):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add("🔙 Orqaga")
     
-    msg = bot.send_message(call.message.chat.id, f"📢 Tanlangan kanalga tashlamoqchi bo'lgan <b>#nft</b> postini yoki ishtirokchi matnini yuboring:", reply_markup=markup)
+    msg = bot.send_message(call.message.chat.id, "📢 Tanlangan kanalga tashlamoqchi bo'lgan <b>#nft</b> postini yoki ishtirokchi matnini yuboring:", reply_markup=markup)
     bot.register_next_step_handler(msg, lambda m: create_battle_final_step(m, chat_id))
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -394,7 +386,7 @@ def create_battle_final_step(message, target_channel):
     
     try:
         bot.send_message(target_channel, battle_text, reply_markup=markup)
-        bot.send_message(message.from_user.id, "✅ Battle posti tanlagan kanalingizga muvaffaqiyatli e'lon qilindi!", reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add("⚔️️ Battle yaratish", "📢 Mening kanallarim", "🔙 Orqaga"))
+        bot.send_message(message.from_user.id, "✅ Battle posti tanlagan kanalingizga muvaffaqiyatli e'lon qilindi!", reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add("⚔️ Battle yaratish", "📢 Mening kanallarim", "🔙 Orqaga"))
     except Exception as e:
         bot.send_message(message.from_user.id, 
             f"❌ Xatolik: Bot tanlangan kanalga xabar yubora olmadi.\n\n"
@@ -402,7 +394,6 @@ def create_battle_final_step(message, target_channel):
             f"Xato tafsiloti: <code>{e}</code>"
         )
 
-# --- NATIJALAR TUGMASI ---
 @bot.callback_query_handler(func=lambda call: call.data == "battle_results")
 def battle_results_callback(call):
     conn = db_connect()
@@ -424,7 +415,6 @@ def battle_results_callback(call):
     except Exception:
         bot.answer_callback_query(call.id, "Natijalarni ko'rish uchun avval botga /start bosing!", show_alert=True)
 
-# --- FOYDALANUVCHINI BOSHQARISH VA ADMIN FUNKSIYALARI ---
 @bot.callback_query_handler(func=lambda call: call.data.startswith("adm_user_"))
 def admin_manage_user_callback(call):
     target_id = int(call.data.split("_")[2])
@@ -474,11 +464,11 @@ def user_action_callback(call):
     
     if action == "add":
         target_id = int(data[2])
-        msg = bot.send_message(call.message.chat.id, f"Qancha ball qo'shmoqchisiz? (Faqat raqam yuboring):")
+        msg = bot.send_message(call.message.chat.id, "Qancha ball qo'shmoqchisiz? (Faqat raqam yuboring):")
         bot.register_next_step_handler(msg, lambda m: update_user_score(m, target_id, plus=True))
     elif action == "sub":
         target_id = int(data[2])
-        msg = bot.send_message(call.message.chat.id, f"Qancha ball ayirmoqchisiz? (Faqat raqam yuboring):")
+        msg = bot.send_message(call.message.chat.id, "Qancha ball ayirmoqchisiz? (Faqat raqam yuboring):")
         bot.register_next_step_handler(msg, lambda m: update_user_score(m, target_id, plus=False))
     elif action == "block":
         target_id = int(data[2])
@@ -523,7 +513,7 @@ def update_user_score(message, target_id, plus):
         cursor.execute("UPDATE users SET score = score - ? WHERE user_id = ?", (amount, target_id))
     conn.commit()
     conn.close()
-    bot.send_message(message.from_user.id, f"✅ Muvaffaqiyatli bajarildi!")
+    bot.send_message(message.from_user.id, "✅ Muvaffaqiyatli bajarildi!")
 
 def add_channel_step(message):
     ch_id = clean_channel_input(message.text)
