@@ -10,6 +10,9 @@ bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
 
 ADMINS = [8372285180]  # O'z Telegram ID raqamingiz
 
+# Vaqtinchalik ma'lumotlarni saqlash uchun (state)
+user_data_cache = {}
+
 # --- RENDER UCHUN FLASK SERVER ---
 app = Flask('')
 
@@ -52,12 +55,6 @@ def init_db():
             user_id INTEGER,
             chat_id TEXT,
             chat_title TEXT
-        )
-    """)
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS settings (
-            key TEXT PRIMARY KEY,
-            value TEXT
         )
     """)
     conn.commit()
@@ -149,13 +146,13 @@ def send_welcome(message):
 
 def show_main_menu(chat_id, name):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add("⚔️ Battle yaratish", "📢 Mening kanallarim")
+    markup.add("⚔️ Battle / Konkurs ochish", "📢 Mening kanallarim")
     markup.add("🔗 Mening havolam", "🏆 Top Reyting")
     markup.add("📊 Statistika")
     if chat_id in ADMINS:
         markup.add("Admin Panel")
-    
-    bot.send_message(chat_id, f"Salom, <b>{name}</b>! Botga xush kelibsiz.", reply_markup=markup)
+     
+    bot.send_message(chat_id, f"Salom, <b>{name}</b>! Botga xush kelibsiz. Quyidagi menyudan keraklisini tanlang:", reply_markup=markup)
 
 @bot.callback_query_handler(func=lambda call: call.data == "check_sub")
 def callback_check_sub(call):
@@ -196,7 +193,7 @@ def handle_text(message):
         bot.send_message(user_id, "⚠️ Iltimos, avval kanallarga obuna bo'ling va /start bosing!")
         return
 
-    if text == "⚔️ Battle yaratish":
+    if text == "⚔️ Battle / Konkurs ochish":
         conn = db_connect()
         cursor = conn.cursor()
         cursor.execute("SELECT chat_id, chat_title FROM user_channels WHERE user_id = ?", (user_id,))
@@ -210,9 +207,9 @@ def handle_text(message):
         markup = types.InlineKeyboardMarkup(row_width=1)
         for ch in my_chans:
             markup.add(types.InlineKeyboardButton(text=f"📢 {ch[1]}", callback_data=f"sel_ch_{ch[0]}"))
-        markup.add(types.InlineKeyboardButton(text="🔙 Bekor qilish", callback_data="cancel_battle"))
+        markup.add(types.InlineKeyboardButton(text="🔙 Bekor qilish", callback_data="cancel_action"))
 
-        bot.send_message(user_id, "🎯 Battle qaysi kanalingizga tashlansin? Keraklisini tanlang:", reply_markup=markup)
+        bot.send_message(user_id, "🎯 Post qaysi kanalingizga tashlansin? Kanalni tanlang:", reply_markup=markup)
 
     elif text == "📢 Mening kanallarim":
         conn = db_connect()
@@ -248,8 +245,8 @@ def handle_text(message):
         cursor.execute("SELECT full_name, score FROM users ORDER BY score DESC LIMIT 10")
         top_users = cursor.fetchall()
         conn.close()
-        
-        text_top = "🏆 <b>TOP 10 BATTLE REYTINGI</b>\n\n"
+         
+        text_top = "🏆 <b>TOP 10 REYTING</b>\n\n"
         for i, u in enumerate(top_users, 1):
             text_top += f"{i}. {u[0]} — {u[1]} ball\n"
         bot.send_message(user_id, text_top)
@@ -325,6 +322,12 @@ def save_user_channel_step(message):
         chat_id = str(chat_info.id)
         chat_title = chat_info.title
 
+        # Bot o'sha kanalda admin ekanligini tekshiramiz
+        bot_member = bot.get_chat_member(chat_id, bot.get_me().id)
+        if bot_member.status not in ['administrator', 'creator']:
+            bot.send_message(user_id, "❌ Xatolik: Bot tanlangan kanalga **Admin** qilinmagan!")
+            return
+
         conn = db_connect()
         cursor = conn.cursor()
         cursor.execute("INSERT INTO user_channels (user_id, chat_id, chat_title) VALUES (?, ?, ?)", (user_id, chat_id, chat_title))
@@ -333,7 +336,7 @@ def save_user_channel_step(message):
 
         bot.send_message(user_id, f"✅ Kanal/Guruh muvaffaqiyatli ulandi: <b>{chat_title}</b>")
     except Exception as e:
-        bot.send_message(user_id, f"❌ Xatolik: Kanal topilmadi yoki bot o'sha kanalga admin qilinmagan!\n\nTafsilot: <code>{e}</code>")
+        bot.send_message(user_id, f"❌ Xatolik: Kanal topilmadi yoki bot u yerda admin emas!\n\nTafsilot: <code>{e}</code>")
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("del_uch_"))
 def delete_user_channel_callback(call):
@@ -350,49 +353,91 @@ def delete_user_channel_callback(call):
         pass
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("sel_ch_"))
-def select_channel_for_battle(call):
+def select_channel_for_action(call):
     chat_id = call.data.split("_")[2]
-    
+    user_data_cache[call.from_user.id] = {"target_channel": chat_id}
+     
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton(text="⚔️ Battle", callback_data="type_battle"),
+        types.InlineKeyboardButton(text="🎁 Konkurs", callback_data="type_konkurs")
+    )
+    markup.add(types.InlineKeyboardButton(text="🔙 Bekor qilish", callback_data="cancel_action"))
+
+    try:
+        bot.edit_message_text("Nima turini o'tkazmoqchisiz? Quyidagilardan birini tanlang:", call.message.chat.id, call.message.message_id, reply_markup=markup)
+    except:
+        bot.send_message(call.message.chat.id, "Nima turini o'tkazmoqchisiz? Quyidagilardan birini tanlang:", reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: call.data in ["type_battle", "type_konkurs"])
+def select_type_callback(call):
+    action_type = "Battle" if call.data == "type_battle" else "Konkurs"
+    user_id = call.from_user.id
+    if user_id in user_data_cache:
+        user_data_cache[user_id]["action_type"] = action_type
+
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add("🔙 Orqaga")
-    
-    msg = bot.send_message(call.message.chat.id, "📢 Tanlangan kanalga tashlamoqchi bo'lgan <b>#nft</b> postini yoki ishtirokchi matnini yuboring:", reply_markup=markup)
-    bot.register_next_step_handler(msg, lambda m: create_battle_final_step(m, chat_id))
+
+    msg = bot.send_message(call.message.chat.id, f"📢 Siz <b>{action_type}</b> tanladingiz.\n\nEndi kanalga tashlanadigan **rasm** (foto) yoki **matnni** yuboring (rasm bilan birga matn ham yuborishingiz mumkin):", reply_markup=markup)
+    bot.register_next_step_handler(msg, receive_post_content)
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except:
         pass
 
-@bot.callback_query_handler(func=lambda call: call.data == "cancel_battle")
-def cancel_battle_callback(call):
+@bot.callback_query_handler(func=lambda call: call.data == "cancel_action")
+def cancel_action_callback(call):
     try:
         bot.delete_message(call.message.chat.id, call.message.message_id)
     except:
         pass
-    bot.send_message(call.message.chat.id, "❌ Battle yaratish bekor qilindi.")
+    bot.send_message(call.message.chat.id, "❌ Amal bekor qilindi.")
 
-def create_battle_final_step(message, target_channel):
+def receive_post_content(message):
+    user_id = message.from_user.id
     if message.text == "🔙 Orqaga":
-        show_main_menu(message.from_user.id, message.from_user.first_name)
+        show_main_menu(user_id, message.from_user.first_name)
         return
 
+    if user_id not in user_data_cache:
+        bot.send_message(user_id, "❌ Xatolik yuz berdi. Iltimos, boshidan urinib ko'ring: /start")
+        return
+
+    target_channel = user_data_cache[user_id].get("target_channel")
+    action_type = user_data_cache[user_id].get("action_type", "Battle")
+
+    # Tugmalar
     markup = types.InlineKeyboardMarkup()
     markup.add(
-        types.InlineKeyboardButton(text="🔥 Qatnashish", url=f"https://t.me/{bot.get_me().username}?start={message.from_user.id}"),
+        types.InlineKeyboardButton(text="🔥 Qatnashish", url=f"https://t.me/{bot.get_me().username}?start={user_id}"),
         types.InlineKeyboardButton(text="📊 Natijalar", callback_data="battle_results")
     )
 
-    battle_text = f"<b>3 ➔ N F T B A T L 👑</b>\n\nIshtirokchi: {message.from_user.first_name} (@{message.from_user.username or 'yoq'})\n\n{message.text}"
+    header_title = "3 ➔ N F T B A T L 👑" if action_type == "Battle" else "🎁 K O N K U R S 🏆"
+    user_caption = message.caption or message.text or ""
     
+    post_text = f"<b>{header_title}</b>\n\nIshtirokchi: {message.from_user.first_name} (@{message.from_user.username or 'yoq'})\n\n{user_caption}"
+
     try:
-        bot.send_message(target_channel, battle_text, reply_markup=markup)
-        bot.send_message(message.from_user.id, "✅ Battle posti tanlagan kanalingizga muvaffaqiyatli e'lon qilindi!", reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add("⚔️ Battle yaratish", "📢 Mening kanallarim", "🔙 Orqaga"))
+        if message.photo:
+            photo_id = message.photo[-1].file_id
+            bot.send_photo(target_channel, photo_id, caption=post_text, parse_mode="HTML", reply_markup=markup)
+        else:
+            bot.send_message(target_channel, post_text, parse_mode="HTML", reply_markup=markup)
+
+        bot.send_message(user_id, f"✅ Sizning {action_type.lower()} postingiz tanlangan kanalga muvaffaqiyatli e'lon qilindi!", reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add("⚔️ Battle / Konkurs ochish", "📢 Mening kanallarim", "🔙 Orqaga"))
     except Exception as e:
-        bot.send_message(message.from_user.id, 
+        bot.send_message(user_id, 
             f"❌ Xatolik: Bot tanlangan kanalga xabar yubora olmadi.\n\n"
-            f"Sabab: Bot o'sha kanalga **Admin** qilinganligiga va xabar yozish huquqi borligiga ishonch hosil qiling!\n\n"
-            f"Xato tafsiloti: <code>{e}</code>"
+            f"Sabab: Bot o'sha kanalga **Admin** qilinganligiga va xabar/rasm yuborish huquqi borligiga ishonch hosil qiling!\n\n"
+            f"Xato tafsiloti: <code>{e}</code>",
+            reply_markup=types.ReplyKeyboardMarkup(resize_keyboard=True).add("⚔️ Battle / Konkurs ochish", "📢 Mening kanallarim", "🔙 Orqaga")
         )
+    
+    # Xotirani tozalash
+    if user_id in user_data_cache:
+        del user_data_cache[user_id]
 
 @bot.callback_query_handler(func=lambda call: call.data == "battle_results")
 def battle_results_callback(call):
@@ -402,7 +447,7 @@ def battle_results_callback(call):
     top_users = cursor.fetchall()
     conn.close()
 
-    result_text = "📊 <b>BATTLE JORIY NATIJALARI</b>\n\n"
+    result_text = "📊 <b>JORIY NATIJALAR VA REYTING</b>\n\n"
     if top_users:
         for i, u in enumerate(top_users, 1):
             result_text += f"{i}. <b>{u[0]}</b> — ⭐ {u[1]} ball (👥 {u[2]} ta taklif)\n"
@@ -449,7 +494,7 @@ def admin_manage_user_callback(call):
         markup.add(types.InlineKeyboardButton(text="✅ Blokdan chiqarish", callback_data=f"unblock_user_{target_id}"))
     else:
         markup.add(types.InlineKeyboardButton(text="🚫 Bloklash", callback_data=f"block_user_{target_id}"))
-        
+         
     markup.add(types.InlineKeyboardButton(text="🗑 Bazadan o'chirish", callback_data=f"del_user_{target_id}"))
 
     try:
@@ -461,7 +506,7 @@ def admin_manage_user_callback(call):
 def user_action_callback(call):
     data = call.data.split("_")
     action = data[0]
-    
+     
     if action == "add":
         target_id = int(data[2])
         msg = bot.send_message(call.message.chat.id, "Qancha ball qo'shmoqchisiz? (Faqat raqam yuboring):")
@@ -557,6 +602,6 @@ def broadcast_step(message):
 if __name__ == "__main__":
     t = threading.Thread(target=run_flask)
     t.start()
-    
-    print("Ko'p kanalli Mukammal Battle Bot ishga tushdi...")
+     
+    print("Mukammal Battle va Konkurs Bot ishga tushdi...")
     bot.infinity_polling()
